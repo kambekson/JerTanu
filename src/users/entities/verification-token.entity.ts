@@ -14,4 +14,4 @@ export class VerificationTokenEntity {
 
   @ManyToOne(() => UserEntity, (user) => user.verificationTokens)
   user: UserEntity;
-} 
+}

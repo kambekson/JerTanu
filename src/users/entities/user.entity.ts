@@ -1,6 +1,6 @@
 import { AfterInsert, Column, Entity, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
-import { VerificationTokenEntity } from './verification-token.entity';
-import { PasswordResetTokenEntity } from './password-reset-token.entity';
+import { VerificationTokenEntity } from '../entities/verification-token.entity';
+import { PasswordResetTokenEntity } from '../entities/password-reset-token.entity';
 
 @Entity({
   name: 'users',
@@ -8,6 +8,12 @@ import { PasswordResetTokenEntity } from './password-reset-token.entity';
 export class UserEntity {
   @PrimaryGeneratedColumn()
   id: number;
+
+  @Column()
+  firstName: string;
+
+  @Column()
+  lastName: string;
 
   @Column()
   email: string;

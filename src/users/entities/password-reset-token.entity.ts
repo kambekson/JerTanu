@@ -14,4 +14,4 @@ export class PasswordResetTokenEntity {
 
   @ManyToOne(() => UserEntity, (user) => user.passwordResetTokens)
   user: UserEntity;
-} 
+}
