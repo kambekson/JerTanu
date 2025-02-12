@@ -4,6 +4,10 @@ import { UserEntity } from './entities/user.entity';
 import { Repository } from 'typeorm';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { scrypt as _scrypt, randomBytes } from 'crypto';
+import { promisify } from 'util';
+
+const scrypt = promisify(_scrypt);
 
 @Injectable()
 export class UsersService {
@@ -12,7 +16,10 @@ export class UsersService {
   ) {}
 
   create(credentials: CreateUserDto): Promise<UserEntity> {
-    const user = this.userRepo.create(credentials);
+    const user = this.userRepo.create({
+      ...credentials,
+      isVerified: false
+    });
     return this.userRepo.save(user);
   }
 
@@ -33,6 +40,13 @@ export class UsersService {
   async update(id: number, credentials: UpdateUserDto): Promise<UserEntity> {
     const user = await this.findById(id);
     if (!user) throw new NotFoundException(`User with ID = ${id} not found`);
+
+    if (credentials.password) {
+      const salt = randomBytes(8).toString('hex');
+      const hash = (await scrypt(credentials.password, salt, 32)) as Buffer;
+      credentials.password = `${salt}.${hash.toString('hex')}`;
+    }
+
     Object.assign(user, credentials);
     return this.userRepo.save(user);
   }
