@@ -1,17 +1,18 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
-import { CreateUserDto } from '../users/dto/create-user.dto';
-import { UsersService } from '../users/users.service';
-import { scrypt as _scrypt, randomBytes } from 'crypto';
-import { promisify } from 'util';
+import { BadRequestException, Injectable } from "@nestjs/common";
+import { CreateUserDto } from "../users/dto/create-user.dto";
+import { UsersService } from "../users/users.service";
+import { scrypt as _scrypt, randomBytes } from "crypto";
+import { promisify } from "util";
 import { Buffer } from 'buffer';
-import { JwtService } from '@nestjs/jwt';
-import { UserEntity } from '../users/entities/user.entity';
-import { EmailService } from '../email/email.service';
-import { InjectRepository } from '@nestjs/typeorm';
-import { VerificationTokenEntity } from '../users/entities/verification-token.entity';
-import { Repository } from 'typeorm';
-import { UpdateUserDto } from '../users/dto/update-user.dto';
-import { PasswordResetTokenEntity } from '../users/entities/password-reset-token.entity';
+import { JwtService } from "@nestjs/jwt";
+import { UserEntity } from "../users/user.entity";
+import { SignInDto } from "./dto/sign-in.dto";
+import { EmailService } from "../email/email.service";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import { VerificationTokenEntity } from "src/email/verification-token.entity";
+import { PasswordResetTokenEntity } from "src/email/password-reset-token.entity";
+import { UpdateUserDto } from "src/users/dto/update-user.dto";
 
 const scrypt = promisify(_scrypt);
 
@@ -24,41 +25,35 @@ export class AuthService {
     @InjectRepository(VerificationTokenEntity)
     private tokenRepo: Repository<VerificationTokenEntity>,
     @InjectRepository(PasswordResetTokenEntity)
-    private passwordResetTokenRepo: Repository<PasswordResetTokenEntity>,
+    private passwordResetTokenRepo: Repository<PasswordResetTokenEntity>
   ) {}
 
-  async signUp({ email, password, firstName, lastName }: CreateUserDto) {
+  async signUp({ email, password, profile }: CreateUserDto) {
     const user = await this.userService.findOneByEmail(email);
     if (user) throw new BadRequestException(`User ${user.email} in use`);
 
     const salt = randomBytes(8).toString('hex');
     const hash = (await scrypt(password, salt, 32)) as Buffer;
     const result = `${salt}.${hash.toString('hex')}`;
-    const newUser = await this.userService.create({
-      email,
-      password: result,
-      firstName,
-      lastName,
-      isVerified: false,
-      confirmPassword: password
-    });
+    const newUser = await this.userService.create({ email, password: result, profile })
 
-    const verificationToken = await this.createVerificationToken(newUser);
-    await this.emailService.sendVerificationEmail(email, verificationToken.token);
-    return newUser;
+    const verificationToken = await this.createVerificationToken(newUser)
+    await this.emailService.sendVerificationEmail(email, verificationToken.token)
+    return newUser
+
   }
 
-  private async createVerificationToken(user: UserEntity) {
-    const token = randomBytes(32).toString('hex');
-    const expiresAt = new Date();
-    expiresAt.setHours(expiresAt.getHours() + 24); // Время жизни токена 24 часа
-    const verificationToken = this.tokenRepo.create({
-      token,
-      expiresAt,
-      user,
-    });
+  async validateUser({ email, password }: SignInDto) {
+    const user = await this.userService.findOneByEmail(email);
+    if (!user) throw new BadRequestException('Invalid email');
 
-    return this.tokenRepo.save(verificationToken);
+    const [salt, hashedPassword] = user.password.split('.');
+    const hash = (await scrypt(password, salt, 32)) as Buffer;
+
+    if (hash.toString('hex') !== hashedPassword) return null;
+    const { password: userPassword, ...result } = user;
+
+    return result;
   }
 
   async verifyEmail(token: string) {
@@ -82,28 +77,29 @@ export class AuthService {
     return { message: 'Email verified successfully' };
   }
 
-  async validateUser({ email, password }: CreateUserDto) {
-    const user = await this.userService.findOneByEmail(email);
-    if (!user) throw new BadRequestException('Invalid email');
+  private async createVerificationToken(user: UserEntity) {
+    const token = randomBytes(32).toString('hex');
+    const expiresAt = new Date();
+    expiresAt.setHours(expiresAt.getHours() + 2);
+    const verificationToken = this.tokenRepo.create({
+      token,
+      expiresAt,
+      user,
+    });
 
-    const [salt, hashedPassword] = user.password.split('.');
-    const hash = (await scrypt(password, salt, 32)) as Buffer;
-
-    if (hash.toString('hex') !== hashedPassword) return null;
-
-    const { password: userPassword, ...result } = user;
-    return result;
+    return this.tokenRepo.save(verificationToken);
   }
 
-  signIn(user: Omit<UserEntity, 'password'>) {
+  signIn(user: Omit<UserEntity, "password">) {
     return {
-      access_token: this.jwtService.sign(user),
+      access_token: this.jwtService.sign(user, { expiresIn: '60s'}),
+      refresh_token: this.jwtService.sign(user, { expiresIn: '4d'})
     };
   }
 
-  signOut(user: Omit<UserEntity, 'password'>) {
+  refreshToken(user: Omit<UserEntity, "password">) {
     return {
-      access_token: null,
+      access_token: this.jwtService.sign(user)
     };
   }
 
@@ -118,9 +114,9 @@ export class AuthService {
   }
 
   private async createPasswordResetToken(user: UserEntity) {
-    const token = randomBytes(3).toString('hex').toUpperCase(); // 6-character code
+    const token = randomBytes(3).toString('hex').toUpperCase();
     const expiresAt = new Date();
-    expiresAt.setMinutes(expiresAt.getMinutes() + 30); // Token expires in 30 minutes
+    expiresAt.setMinutes(expiresAt.getMinutes() + 30);
 
     const resetToken = this.passwordResetTokenRepo.create({
       token,

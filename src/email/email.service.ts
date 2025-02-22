@@ -9,12 +9,11 @@ export class EmailService implements OnModuleInit {
 
   constructor(private readonly configService: ConfigService) {
     this.transporter = nodemailer.createTransport({
-      host: this.configService.get<string>('MAILTRAP_HOST'), // Используйте host для Mailtrap
-      port: this.configService.get<number>('MAILTRAP_PORT'),               // Порт для Mailtrap
+      host: this.configService.get<string>('MAILTRAP_HOST'),
+      port: this.configService.get<number>('MAILTRAP_PORT'),
       auth: {
-        user: this.configService.get<string>('MAILTRAP_USER'),  // Добавьте в .env MAILTRAP_USER
-
-        pass: process.env.MAILTRAP_PASS,  // Добавьте в .env MAILTRAP_PASS
+        user: this.configService.get<string>('MAILTRAP_USER'),
+        pass: process.env.MAILTRAP_PASS,
       },
     });
   }
@@ -24,14 +23,12 @@ export class EmailService implements OnModuleInit {
       service: 'gmail',
       auth: {
         type: 'OAuth2',
-        user: this.configService.get<string>('EMAIL_USER'),
-        clientId: this.configService.get<string>('EMAIL_CLIENT_ID'),
-        clientSecret: this.configService.get<string>('EMAIL_CLIENT_SECRET'),
-        refreshToken: this.configService.get<string>('EMAIL_REFRESH_TOKEN'),
+        user: this.configService.get<string>('GMAIL_USER'),
+        clientId: this.configService.get<string>('GOOGLE_CLIENT_ID'),
+        clientSecret: this.configService.get<string>('GOOGLE_CLIENT_SECRET'),
+        refreshToken: this.configService.get<string>('GOOGLE_REFRESH_TOKEN'),
       },
     });
-
-    // Проверка подключения
     this.transporter.verify((error, success) => {
       if (error) {
         this.logger.error('Ошибка подключения к почтовому серверу:', error);
@@ -43,14 +40,9 @@ export class EmailService implements OnModuleInit {
 
   async sendVerificationEmail(email: string, token: string) {
     const appUrl = this.configService.get<string>('APP_URL');
-    // const verificationLink = `${appUrl}/api/auth/verify-email/${token}`;
     const verificationLink = `${process.env.APP_URL}/api/auth/verify-email/${token}`;
-
-
     await this.transporter.sendMail({
-      // from: `"My App" <${this.configService.get<string>('EMAIL_USER')}>`,
-      from: process.env.MAILTRAP_USER,  // Укажите ваш адрес отправителя
-
+      from: process.env.MAILTRAP_USER,
       to: email,
       subject: 'Verify your email',
       html: `

@@ -1,8 +1,8 @@
 import { Column, Entity, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
-import { UserEntity } from './user.entity';
+import { UserEntity } from '../users/user.entity';
 
-@Entity('password_reset_tokens')
-export class PasswordResetTokenEntity {
+@Entity('verification_tokens')
+export class VerificationTokenEntity {
   @PrimaryGeneratedColumn()
   id: number;
 
@@ -12,6 +12,6 @@ export class PasswordResetTokenEntity {
   @Column()
   expiresAt: Date;
 
-  @ManyToOne(() => UserEntity, (user) => user.passwordResetTokens)
+  @ManyToOne(() => UserEntity, (user) => user.verificationTokens)
   user: UserEntity;
 }
